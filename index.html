@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Earnings — Live Flip Ticker</title>
+<style>
+  :root{
+    /* backdrop — deep, rich, not black/white/off-white */
+    --bg-1:#141b2b;
+    --bg-2:#0b0f18;
+    --text:#e8ecf4;
+    --muted:#93a0b8;
+    --dim:#5c6a82;
+    --line:#232c3e;
+    --panel:#151b28;
+
+    /* flip cards — warm ivory white, vivid black digits */
+    --card:#f7f6f1;
+    --card-hi:#ffffff;
+    --card-lo:#e6e4db;
+    --ink:#0c0d0f;
+    --ink-lead:#c8c6bd;      /* dimmed leading zeros */
+    --seam:rgba(0,0,0,.28);
+
+    --accent:#5eead4;         /* teal */
+    --win:#fbbf24;            /* amber – contingent win */
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono','Roboto Mono',Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+
+    /* flip timing */
+    --fd:340ms;               /* full flip duration (big digits) */
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:
+      radial-gradient(1200px 700px at 50% -8%, var(--bg-1) 0%, transparent 62%),
+      linear-gradient(180deg, #10151f 0%, var(--bg-2) 100%);
+    background-attachment:fixed;
+    color:var(--text);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    padding:22px 14px 48px;
+    overflow-x:hidden;
+  }
+  .wrap{max-width:900px;margin:0 auto;display:flex;flex-direction:column;align-items:center}
+
+  /* ---- mode switch (small, secondary) ---- */
+  .modes{display:inline-flex;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:99px;padding:3px;gap:2px;margin-bottom:34px}
+  .modes button{
+    appearance:none;border:0;background:transparent;color:var(--muted);
+    font-family:var(--sans);font-size:11.5px;font-weight:600;letter-spacing:.3px;
+    padding:6px 14px;border-radius:99px;cursor:pointer;transition:.15s;white-space:nowrap;
+  }
+  .modes button.active{background:rgba(94,234,212,.14);color:var(--accent)}
+  .modes button:not(.active):hover{color:var(--text)}
+
+  /* ---- board label ---- */
+  .boardlabel{font-size:11px;letter-spacing:2.4px;text-transform:uppercase;color:var(--dim);font-weight:700;margin-bottom:16px;text-align:center}
+  .boardlabel b{color:var(--accent)}
+
+  /* ============ SPLIT-FLAP BOARD ============ */
+  .board{
+    display:flex;align-items:stretch;justify-content:center;gap:5px;
+    perspective:900px;margin-bottom:8px;max-width:100%;
+    --fw:clamp(30px,9vw,60px);   /* digit width */
+    --fh:clamp(46px,13.5vw,90px);/* digit height */
+    --fs:clamp(34px,10vw,66px);  /* font size */
+    --rad:9px;
+  }
+  .sym,.sep{
+    display:flex;align-items:flex-end;justify-content:center;
+    font-family:var(--mono);font-weight:700;color:#cdd6e6;
+    font-size:calc(var(--fs) * .78);line-height:1;padding-bottom:.12em;
+    text-shadow:0 2px 6px rgba(0,0,0,.4);
+  }
+  .sym{align-items:center;font-size:calc(var(--fs) * .58);color:var(--accent);padding:0 2px 6px 0}
+  .sep{width:calc(var(--fw) * .34)}
+
+  .flap-digit{
+    position:relative;width:var(--fw);height:var(--fh);flex:none;
+    font-family:var(--mono);font-weight:700;
+    filter:drop-shadow(0 8px 14px rgba(0,0,0,.45));
+  }
+  .flap-digit .half{
+    position:absolute;left:0;width:100%;height:calc(var(--fh) / 2);
+    overflow:hidden;color:var(--ink);backface-visibility:hidden;
+  }
+  .flap-digit .half .d{
+    position:absolute;left:0;width:100%;height:var(--fh);
+    line-height:var(--fh);text-align:center;font-size:var(--fs);
+    font-variant-numeric:tabular-nums;
+  }
+  .flap-digit .half.top{
+    top:0;border-radius:var(--rad) var(--rad) 0 0;
+    background:linear-gradient(180deg,var(--card-hi),var(--card));
+    border-bottom:1px solid var(--seam);
+  }
+  .flap-digit .half.bottom{
+    bottom:0;border-radius:0 0 var(--rad) var(--rad);
+    background:linear-gradient(180deg,var(--card),var(--card-lo));
+  }
+  .flap-digit .half.top .d{top:0}
+  .flap-digit .half.bottom .d{bottom:0}
+
+  /* leading-zero dimming */
+  .flap-digit.lead .half .d{color:var(--ink-lead)}
+
+  /* animating leaves */
+  .flap-digit .half.flip{z-index:6;display:none}
+  .flap-digit .half.top.flip{transform-origin:center bottom}
+  .flap-digit .half.bottom.flip{transform-origin:center top;transform:rotateX(90deg)}
+  .flap-digit .half.top.flip.go{
+    display:block;
+    animation:flipTop calc(var(--fd) / 2) cubic-bezier(.36,0,.66,-0.05) forwards;
+  }
+  .flap-digit .half.bottom.flip.go{
+    display:block;
+    animation:flipBottom calc(var(--fd) / 2) cubic-bezier(.34,1.05,.64,1) forwards;
+    animation-delay:calc(var(--fd) / 2);
+  }
+  /* subtle shading pass so the fold reads as physical */
+  .flap-digit .half.flip::after{
+    content:"";position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;
+    border-radius:inherit;
+  }
+  .flap-digit .half.top.flip.go::after{animation:shadeTop calc(var(--fd) / 2) linear forwards}
+  .flap-digit .half.bottom.flip.go::after{animation:shadeBottom calc(var(--fd) / 2) linear forwards;animation-delay:calc(var(--fd) / 2)}
+
+  @keyframes flipTop{from{transform:rotateX(0)}to{transform:rotateX(-90deg)}}
+  @keyframes flipBottom{from{transform:rotateX(90deg)}to{transform:rotateX(0)}}
+  @keyframes shadeTop{from{opacity:0}to{opacity:.34}}
+  @keyframes shadeBottom{from{opacity:.34}to{opacity:0}}
+
+  /* sub-cent digits — smaller, faster flip */
+  .board .grp-sub{display:flex;gap:4px;align-items:stretch;margin-left:5px}
+  .flap-digit.sub{
+    --fw:clamp(18px,5.4vw,34px);
+    --fh:clamp(28px,8vw,52px);
+    --fs:clamp(19px,5.6vw,38px);
+    --fd:150ms;
+    align-self:flex-end;opacity:.9;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .flap-digit .half.flip.go{animation-duration:1ms !important}
+    .flap-digit .half.flip.go::after{animation-duration:1ms !important}
+  }
+
+  /* ============ WE WIN / WE LOSE TOGGLE ============ */
+  .winbar{margin-top:30px;display:flex;flex-direction:column;align-items:center;gap:12px}
+  .segswitch{
+    position:relative;display:inline-flex;background:rgba(0,0,0,.28);
+    border:1px solid var(--line);border-radius:99px;padding:5px;gap:4px;
+    box-shadow:inset 0 1px 4px rgba(0,0,0,.4);
+  }
+  .segswitch button{
+    appearance:none;border:0;background:transparent;color:var(--muted);
+    font-family:var(--sans);font-size:14px;font-weight:700;letter-spacing:.4px;
+    padding:11px 26px;border-radius:99px;cursor:pointer;transition:.18s;z-index:1;
+  }
+  .segswitch button .em{display:block;font-size:10px;font-weight:600;letter-spacing:.6px;color:var(--dim);margin-top:2px}
+  .segswitch button.active{color:#0c0d0f}
+  .segswitch button.active .em{color:rgba(12,13,15,.65)}
+  .segswitch .glider{
+    position:absolute;top:5px;bottom:5px;width:calc(50% - 5px);left:5px;
+    border-radius:99px;background:#e7ebf3;transition:transform .22s cubic-bezier(.4,0,.2,1);z-index:0;
+    box-shadow:0 3px 10px rgba(0,0,0,.35);
+  }
+  body.win .segswitch .glider{transform:translateX(100%);background:var(--win)}
+
+  .wincaption{font-size:12px;color:var(--muted);text-align:center;min-height:16px;line-height:1.5;max-width:44ch}
+  .wincaption b{color:var(--win);font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .freeze{font-size:11.5px;color:var(--dim);margin-top:2px}
+  .freeze b{color:var(--muted);font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  /* ============ DETAILS (collapsed) ============ */
+  .disclose{margin-top:40px;width:100%;max-width:620px}
+  .disclose summary{
+    list-style:none;cursor:pointer;text-align:center;color:var(--dim);
+    font-size:11px;letter-spacing:1.6px;text-transform:uppercase;font-weight:700;
+    padding:10px;user-select:none;transition:.15s;
+  }
+  .disclose summary::-webkit-details-marker{display:none}
+  .disclose summary:hover{color:var(--muted)}
+  .disclose summary::after{content:" ▾"}
+  .disclose[open] summary::after{content:" ▴"}
+
+  .dgrid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:6px}
+  .dcard{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px}
+  .dcard.full{grid-column:1 / -1}
+  .dcard h3{margin:0 0 11px;font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);font-weight:700}
+  .row{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:var(--muted);padding:5px 0;border-bottom:1px dashed var(--line)}
+  .row:last-child{border-bottom:0}
+  .row b{color:var(--text);font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:13px}
+  .row.hot b{color:var(--accent)}
+  .bar{height:8px;background:#0c1017;border-radius:99px;overflow:hidden;border:1px solid var(--line);margin:4px 0 7px}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,#38bdf8,var(--accent));border-radius:99px;transition:width .3s}
+  .ends{display:flex;justify-content:space-between;font-size:10.5px;color:var(--dim)}
+  .pcbig{font-size:20px;font-weight:600;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .pcdate{font-size:12px;color:#38bdf8;font-weight:600;margin:2px 0 8px}
+  .pccd{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:13px;color:var(--win)}
+  .pcsplit{font-size:11px;color:var(--muted);margin-top:8px}
+  .pcsplit b{color:var(--text);font-family:var(--mono)}
+  .taxcard{border-color:rgba(251,191,36,.25)}
+  .taxcard h3{color:var(--win)}
+  .taxamt{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:23px;font-weight:600;color:var(--win)}
+  .taxcard p{margin:9px 0 0;font-size:11px;color:var(--muted);line-height:1.5}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{width:100%;border-collapse:collapse;font-size:12px;min-width:480px}
+  th,td{padding:8px 9px;text-align:right;white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  thead th{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);font-weight:700;border-bottom:1px solid var(--line)}
+  tbody td{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--muted);border-bottom:1px solid rgba(35,44,62,.5)}
+  tbody td:first-child{font-family:var(--sans);color:var(--text)}
+  tr.banked td:first-child::before{content:"● ";color:var(--accent);font-size:9px}
+  tr.upcoming td:first-child::before{content:"○ ";color:var(--dim);font-size:9px}
+  tr.upcoming{opacity:.58}
+  .pill{font-size:9px;letter-spacing:.4px;text-transform:uppercase;font-weight:700;padding:2px 7px;border-radius:99px;font-family:var(--sans)}
+  .pill.b{background:rgba(94,234,212,.14);color:var(--accent)}
+  .pill.u{background:rgba(92,106,130,.16);color:var(--dim)}
+  .pill.c{background:rgba(251,191,36,.14);color:var(--win)}
+  tr.bonusrow td{color:var(--win);border-top:1px solid var(--line)}
+  tr.bonusrow.off{opacity:.4}
+
+  footer{margin-top:30px;text-align:center;font-size:10.5px;color:var(--dim);line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- secondary: which figure the ticker shows -->
+  <div class="modes" id="modes">
+    <button data-mode="gross" class="active">Gross</button>
+    <button data-mode="net">Net deposited</button>
+    <button data-mode="keep">True keep</button>
+  </div>
+
+  <div class="boardlabel" id="boardLabel">Gross · earned so far</div>
+
+  <!-- THE FLIP TICKER -->
+  <div class="board" id="board"></div>
+
+  <!-- WE WIN / WE LOSE -->
+  <div class="winbar">
+    <div class="segswitch" id="winSwitch">
+      <span class="glider"></span>
+      <button data-win="0" class="active">We lose<span class="em">bonus off</span></button>
+      <button data-win="1">We win<span class="em">+$6,000 bonus</span></button>
+    </div>
+    <div class="wincaption" id="winCaption">Election hasn’t happened — showing guaranteed pay only.</div>
+    <div class="freeze">Freezes at <b id="finalTotal">$0</b> on Nov 15, 2026.</div>
+  </div>
+
+  <!-- DETAILS (collapsed by default) -->
+  <details class="disclose">
+    <summary>The numbers behind it</summary>
+    <div class="dgrid">
+      <div class="dcard full">
+        <h3>Contract progress</h3>
+        <div class="row" style="border:0;padding-bottom:2px"><span>Elapsed</span><b id="pctText">0%</b></div>
+        <div class="bar"><i id="barFill" style="width:0%"></i></div>
+        <div class="ends"><span id="daysElapsed">0 days in</span><span id="daysLeft">146 days left</span></div>
+      </div>
+
+      <div class="dcard">
+        <h3>Earning rate · <span id="rateMode">gross</span></h3>
+        <div class="row"><span>Per day</span><b id="rDay">$0.00</b></div>
+        <div class="row"><span>Per hour</span><b id="rHour">$0.00</b></div>
+        <div class="row hot"><span>Per second</span><b id="rSec">$0.000000</b></div>
+      </div>
+
+      <div class="dcard">
+        <h3>Next paycheck</h3>
+        <div class="pcbig" id="pcNet">$0.00</div>
+        <div class="pcdate" id="pcDate">—</div>
+        <div class="pccd" id="pcCountdown">—</div>
+        <div class="pcsplit" id="pcSplit"></div>
+      </div>
+
+      <div class="dcard taxcard full">
+        <h3>Set aside for taxes</h3>
+        <div class="taxamt">$<span id="taxAmt">0.00</span></div>
+        <p>Sitting in checking but <b style="color:var(--text)">not yours</b> — the gap between what payroll deposited and what survives April’s filing. No Illinois tax (4.95%) withheld; federal under-withheld vs. your real 22% marginal rate. Ends at <b style="color:var(--muted);font-family:var(--mono)" id="taxCap">$5,960.64</b>.</p>
+      </div>
+
+      <div class="dcard full">
+        <h3>Pay period schedule</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Period</th><th>Gross</th><th>Net</th><th>Pay date</th><th>Status</th></tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <footer>
+    Computed client-side from a hardcoded contract schedule · Jun 23 → Nov 15, 2026 · 146 days.<br/>
+    True keep scales gross by 30,879 / 47,215.38 (≈ 65.4%). Not tax advice.
+  </footer>
+</div>
+
+<script>
+/* ============================================================================
+   CONFIG — every contract constant lives here.
+   ========================================================================== */
+const CONFIG = {
+  employmentStart: '2026-06-23T00:00:00',
+  employmentEnd:   '2026-11-16T00:00:00',   // exclusive — through end of Nov 15
+  totalCalendarDays: 146,
+  payDelayDays: 3,
+  trueKeepScale: 30879.00 / 47215.38,        // true keep = gross * this
+  totalsWithBonus: { gross: 47215.38, net: 36839.64, keep: 30879.00 },
+  totalsNoBonus:   { gross: 41215.38, net: 32618.64, keep: 41215.38 * (30879.00/47215.38) },
+  winBonus: { gross: 6000.00, net: 4221.00 },
+  periods: [
+    { label:'Jun 16–30 (partial)', periodEnd:'2026-06-30', accrueStart:'2026-06-23T00:00:00', accrueEnd:'2026-07-01T00:00:00', gross:2215.38, net:1870.90 },
+    { label:'Jul 1–15',   periodEnd:'2026-07-15', accrueStart:'2026-07-01T00:00:00', accrueEnd:'2026-07-16T00:00:00', gross:4000.00, net:3181.92 },
+    { label:'Jul 16–31',  periodEnd:'2026-07-31', accrueStart:'2026-07-16T00:00:00', accrueEnd:'2026-08-01T00:00:00', gross:4000.00, net:3181.92 },
+    { label:'Aug 1–15',   periodEnd:'2026-08-15', accrueStart:'2026-08-01T00:00:00', accrueEnd:'2026-08-16T00:00:00', gross:4000.00, net:3181.92 },
+    { label:'Aug 16–31',  periodEnd:'2026-08-31', accrueStart:'2026-08-16T00:00:00', accrueEnd:'2026-09-01T00:00:00', gross:4500.00, net:3533.67 },
+    { label:'Sep 1–15',   periodEnd:'2026-09-15', accrueStart:'2026-09-01T00:00:00', accrueEnd:'2026-09-16T00:00:00', gross:4500.00, net:3533.67 },
+    { label:'Sep 16–30',  periodEnd:'2026-09-30', accrueStart:'2026-09-16T00:00:00', accrueEnd:'2026-10-01T00:00:00', gross:4500.00, net:3533.67 },
+    { label:'Oct 1–15',   periodEnd:'2026-10-15', accrueStart:'2026-10-01T00:00:00', accrueEnd:'2026-10-16T00:00:00', gross:4500.00, net:3533.67 },
+    { label:'Oct 16–31',  periodEnd:'2026-10-31', accrueStart:'2026-10-16T00:00:00', accrueEnd:'2026-11-01T00:00:00', gross:4500.00, net:3533.67 },
+    { label:'Nov 1–15',   periodEnd:'2026-11-15', accrueStart:'2026-11-01T00:00:00', accrueEnd:'2026-11-16T00:00:00', gross:4500.00, net:3533.67 },
+  ],
+};
+
+/* ---- derived ---- */
+const MS_DAY = 86400000;
+const empStart = new Date(CONFIG.employmentStart).getTime();
+const empEnd   = new Date(CONFIG.employmentEnd).getTime();
+const empSpan  = empEnd - empStart;
+CONFIG.periods.forEach(p => {
+  p._s = new Date(p.accrueStart).getTime();
+  p._e = new Date(p.accrueEnd).getTime();
+  p._days = (p._e - p._s) / MS_DAY;
+  p._payDate = new Date(p.periodEnd + 'T00:00:00').getTime() + CONFIG.payDelayDays * MS_DAY;
+});
+// Normalize per-period net so the base sum lands exactly on stated total - bonus.
+const rawNetBase = CONFIG.periods.reduce((a,p)=>a+p.net,0);
+const NET_FACTOR = (CONFIG.totalsWithBonus.net - CONFIG.winBonus.net) / rawNetBase;
+CONFIG.periods.forEach(p => p._netAdj = p.net * NET_FACTOR);
+
+const fmt  = n => n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtDate = ms => new Date(ms).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+
+/* ---- accrual ---- */
+function periodFrac(now,p){ if(now<=p._s)return 0; if(now>=p._e)return 1; return (now-p._s)/(p._e-p._s); }
+function baseAccrued(now){ let g=0,n=0; for(const p of CONFIG.periods){const f=periodFrac(now,p); g+=p.gross*f; n+=p._netAdj*f;} return {g,n}; }
+function bonusFrac(now){ if(now<=empStart)return 0; if(now>=empEnd)return 1; return (now-empStart)/empSpan; }
+
+let mode='gross', winOn=false;
+const MODE_LABEL={gross:'Gross',net:'Net deposited',keep:'True keep'};
+function modeValue(g,n){ return mode==='gross'?g : mode==='net'?n : g*CONFIG.trueKeepScale; }
+
+/* ============================================================================
+   SPLIT-FLAP ENGINE
+   ========================================================================== */
+class Flap{
+  constructor(el){
+    this.el=el; this.cur=null;
+    el.innerHTML =
+      '<div class="half top static"><div class="d"></div></div>'+
+      '<div class="half bottom static"><div class="d"></div></div>'+
+      '<div class="half top flip"><div class="d"></div></div>'+
+      '<div class="half bottom flip"><div class="d"></div></div>';
+    this.st  = el.querySelector('.top.static .d');
+    this.sb  = el.querySelector('.bottom.static .d');
+    this.ft  = el.querySelector('.top.flip');
+    this.fb  = el.querySelector('.bottom.flip');
+    this.ftd = this.ft.querySelector('.d');
+    this.fbd = this.fb.querySelector('.d');
+    // when the bottom leaf lands, settle the static bottom to the new char
+    this.fb.addEventListener('animationend', () => {
+      this.sb.textContent = this.cur;
+      this.ft.classList.remove('go');
+      this.fb.classList.remove('go');
+    });
+  }
+  set(ch, animate=true){
+    if(ch === this.cur) return;
+    const prev = this.cur;
+    this.cur = ch;
+    if(!animate || prev===null){
+      this.st.textContent=ch; this.sb.textContent=ch; return;
+    }
+    this.st.textContent  = ch;    // new top, revealed as old top folds away
+    this.sb.textContent  = prev;  // old bottom, until new bottom lands
+    this.ftd.textContent = prev;  // folding leaf shows old top
+    this.fbd.textContent = ch;    // unfolding leaf shows new bottom
+    this.ft.classList.remove('go'); this.fb.classList.remove('go');
+    void this.el.offsetWidth;     // restart animations
+    this.ft.classList.add('go');  this.fb.classList.add('go');
+  }
+}
+
+/* build the board: $  D D , D D D . C C   S S(sub) */
+const board = document.getElementById('board');
+const digitFlaps = [];              // 9 flaps: 5 dollar, 2 cent, 2 sub
+const dollarFlaps = [];             // for leading-zero dimming
+function mkSym(ch){ const e=document.createElement('div'); e.className='sym'; e.textContent=ch; board.appendChild(e); }
+function mkSep(ch){ const e=document.createElement('div'); e.className='sep'; e.textContent=ch; board.appendChild(e); }
+function mkDigit(sub,parent){ const e=document.createElement('div'); e.className='flap-digit'+(sub?' sub':''); (parent||board).appendChild(e); const f=new Flap(e); f.el=e; digitFlaps.push(f); if(!sub) dollarFlaps.push(f); return f; }
+
+mkSym('$');
+mkDigit(); mkDigit();          // D0 D1
+mkSep(',');
+mkDigit(); mkDigit(); mkDigit();// D2 D3 D4
+mkSep('.');
+mkDigit(); mkDigit();          // C0 C1 (cents)
+const subGrp=document.createElement('div'); subGrp.className='grp-sub'; board.appendChild(subGrp);
+mkDigit(true,subGrp); mkDigit(true,subGrp); // S0 S1
+
+let seeded=false;
+function renderBoard(value){
+  let dollars=Math.max(0,Math.floor(value));
+  let fracInt=Math.round((value-dollars)*10000);   // 4 decimals
+  if(fracInt>=10000){ dollars+=1; fracInt-=10000; }
+  const dstr=String(dollars).padStart(5,'0').slice(-5);
+  const fstr=String(fracInt).padStart(4,'0');
+  const chars=[dstr[0],dstr[1],dstr[2],dstr[3],dstr[4],fstr[0],fstr[1],fstr[2],fstr[3]];
+  // dim leading zeros on the dollar group
+  let firstNonZero=dstr.search(/[^0]/); if(firstNonZero<0) firstNonZero=4;
+  dollarFlaps.forEach((f,i)=> f.el.classList.toggle('lead', i<firstNonZero));
+  digitFlaps.forEach((f,i)=> f.set(chars[i], seeded));
+  seeded=true;
+}
+
+/* ============================================================================
+   TICK
+   ========================================================================== */
+function tick(){
+  const now=Date.now();
+  const base=baseAccrued(now);
+  const bf=bonusFrac(now);
+  const grossNow = base.g + (winOn?CONFIG.winBonus.gross*bf:0);
+  const netNow   = base.n + (winOn?CONFIG.winBonus.net  *bf:0);
+
+  renderBoard(modeValue(grossNow, netNow));
+
+  /* ---- details ---- */
+  const elapsedDays=Math.max(0,Math.min(CONFIG.totalCalendarDays,(now-empStart)/MS_DAY));
+  const pct=elapsedDays/CONFIG.totalCalendarDays;
+  document.getElementById('barFill').style.width=(pct*100).toFixed(2)+'%';
+  document.getElementById('pctText').textContent=(pct*100).toFixed(1)+'%';
+  const daysLeft=Math.max(0,CONFIG.totalCalendarDays-elapsedDays);
+  document.getElementById('daysElapsed').textContent = now<empStart?'not started':elapsedDays.toFixed(2)+' days in';
+  document.getElementById('daysLeft').textContent = daysLeft<=0?'complete':daysLeft.toFixed(2)+' days to Nov 15';
+
+  let dailyG=0,dailyN=0;
+  if(now>=empStart && now<empEnd){
+    const active=CONFIG.periods.find(p=>now>=p._s && now<p._e);
+    if(active){ dailyG=active.gross/active._days; dailyN=active._netAdj/active._days; }
+    if(winOn){ dailyG+=CONFIG.winBonus.gross/CONFIG.totalCalendarDays; dailyN+=CONFIG.winBonus.net/CONFIG.totalCalendarDays; }
+  }
+  const dayRate=modeValue(dailyG,dailyN);
+  document.getElementById('rDay').textContent='$'+fmt(dayRate);
+  document.getElementById('rHour').textContent='$'+fmt(dayRate/24);
+  document.getElementById('rSec').textContent='$'+(dayRate/MS_DAY*1000).toFixed(6);
+
+  const next=CONFIG.periods.find(p=>p._payDate>now);
+  if(next){
+    document.getElementById('pcNet').textContent='$'+fmt(next.net);
+    document.getElementById('pcDate').textContent=fmtDate(next._payDate)+' · '+next.label;
+    document.getElementById('pcSplit').innerHTML='Gross <b>$'+fmt(next.gross)+'</b> · Net <b>$'+fmt(next.net)+'</b>';
+    document.getElementById('pcCountdown').textContent='in '+countdown(next._payDate-now);
+  } else {
+    document.getElementById('pcDate').textContent='All paychecks deposited';
+    document.getElementById('pcCountdown').textContent='Contract complete';
+    document.getElementById('pcSplit').innerHTML='';
+  }
+
+  const taxGap=Math.max(0, netNow - grossNow*CONFIG.trueKeepScale);
+  document.getElementById('taxAmt').textContent=fmt(taxGap);
+}
+function countdown(ms){ if(ms<0)ms=0; const d=Math.floor(ms/MS_DAY),h=Math.floor(ms%MS_DAY/3600000),m=Math.floor(ms%3600000/60000),s=Math.floor(ms%60000/1000),p=n=>String(n).padStart(2,'0'); return (d>0?d+'d ':'')+p(h)+':'+p(m)+':'+p(s); }
+
+/* ---- mode / win UI ---- */
+function refreshUI(){
+  document.querySelectorAll('#modes button').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+  document.getElementById('boardLabel').innerHTML=MODE_LABEL[mode]+' · earned so far';
+  document.getElementById('rateMode').textContent=MODE_LABEL[mode].toLowerCase();
+
+  const totals=winOn?CONFIG.totalsWithBonus:CONFIG.totalsNoBonus;
+  const finalVal=mode==='gross'?totals.gross:mode==='net'?totals.net:totals.keep;
+  document.getElementById('finalTotal').textContent='$'+fmt(finalVal);
+  document.getElementById('taxCap').textContent='$'+fmt(totals.net-totals.keep);
+
+  document.body.classList.toggle('win',winOn);
+  document.querySelectorAll('#winSwitch button').forEach(b=>b.classList.toggle('active',(b.dataset.win==='1')===winOn));
+
+  const cap=document.getElementById('winCaption');
+  if(winOn){
+    const bonusDay=modeValue(CONFIG.winBonus.gross,CONFIG.winBonus.net)/CONFIG.totalCalendarDays;
+    cap.innerHTML='Contingent on winning — the $6,000 bonus adds about <b>$'+fmt(bonusDay)+'/day</b> in '+MODE_LABEL[mode].toLowerCase()+' terms.';
+  } else {
+    cap.innerHTML='Election hasn’t happened — showing guaranteed pay only.';
+  }
+  buildTable();
+}
+
+function buildTable(){
+  const now=Date.now(), tb=document.getElementById('tbody'); tb.innerHTML='';
+  for(const p of CONFIG.periods){
+    const banked=p._payDate<=now, tr=document.createElement('tr');
+    tr.className=banked?'banked':'upcoming';
+    tr.innerHTML='<td>'+p.label+'</td><td>$'+fmt(p.gross)+'</td><td>$'+fmt(p.net)+'</td><td>'+fmtDate(p._payDate)+'</td><td><span class="pill '+(banked?'b':'u')+'">'+(banked?'Banked':'Upcoming')+'</span></td>';
+    tb.appendChild(tr);
+  }
+  const br=document.createElement('tr'); br.className='bonusrow'+(winOn?'':' off');
+  br.innerHTML='<td>Win bonus</td><td>$'+fmt(CONFIG.winBonus.gross)+'</td><td>$'+fmt(CONFIG.winBonus.net)+'</td><td>on win</td><td><span class="pill c">Contingent</span></td>';
+  tb.appendChild(br);
+}
+
+/* ---- wiring ---- */
+document.getElementById('modes').addEventListener('click',e=>{const b=e.target.closest('button'); if(!b)return; mode=b.dataset.mode; refreshUI(); tick();});
+document.getElementById('winSwitch').addEventListener('click',e=>{const b=e.target.closest('button'); if(!b)return; winOn=b.dataset.win==='1'; refreshUI(); tick();});
+
+refreshUI();
+tick();
+setInterval(tick,50);
+</script>
+</body>
+</html>
