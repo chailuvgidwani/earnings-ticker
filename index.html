@@ -283,7 +283,7 @@
       <div class="dcard taxcard full">
         <h3>Set aside for taxes</h3>
         <div class="taxamt">$<span id="taxAmt">0.00</span></div>
-        <p>Sitting in checking but <b style="color:var(--text)">not yours</b> — the gap between what payroll deposited and what survives April’s filing. No Illinois tax (4.95%) withheld; federal under-withheld vs. your real 22% marginal rate. Ends at <b style="color:var(--muted);font-family:var(--mono)" id="taxCap">$5,960.64</b>.</p>
+        <p>Sitting in checking but <b style="color:var(--text)">not yours</b> — the gap between what payroll deposited and what survives April’s filing. No Illinois tax (4.95%) withheld; federal under-withheld vs. your real 22% marginal rate. Ends at <b style="color:var(--muted);font-family:var(--mono)" id="taxCap">$5,805.13</b>.</p>
       </div>
 
       <div class="dcard full">
@@ -300,7 +300,7 @@
 
   <footer>
     Computed client-side from a hardcoded contract schedule · Jun 23 → Nov 15, 2026 · 146 days.<br/>
-    True keep scales gross by 30,879 / 47,215.38 (≈ 65.4%). Not tax advice.
+    True keep scales gross by 31,533 / 48,215.38 (≈ 65.4%). Not tax advice.
   </footer>
 </div>
 
@@ -312,22 +312,21 @@ const CONFIG = {
   employmentStart: '2026-06-23T00:00:00',
   employmentEnd:   '2026-11-16T00:00:00',   // exclusive — through end of Nov 15
   totalCalendarDays: 146,
-  payDelayDays: 3,
   trueKeepScale: 30879.00 / 47215.38,        // true keep = gross * this
-  totalsWithBonus: { gross: 47215.38, net: 36839.64, keep: 30879.00 },
-  totalsNoBonus:   { gross: 41215.38, net: 32618.64, keep: 41215.38 * (30879.00/47215.38) },
+  totalsWithBonus: { gross: 48215.38, net: 37635.12, keep: 31533.00 },
+  totalsNoBonus:   { gross: 42215.38, net: 33414.12, keep: 42215.38 * (30879.00/47215.38) },
   winBonus: { gross: 6000.00, net: 4221.00 },
   periods: [
-    { label:'Jun 16–30 (partial)', periodEnd:'2026-06-30', accrueStart:'2026-06-23T00:00:00', accrueEnd:'2026-07-01T00:00:00', gross:2215.38, net:1870.90 },
-    { label:'Jul 1–15',   periodEnd:'2026-07-15', accrueStart:'2026-07-01T00:00:00', accrueEnd:'2026-07-16T00:00:00', gross:4000.00, net:3181.92 },
-    { label:'Jul 16–31',  periodEnd:'2026-07-31', accrueStart:'2026-07-16T00:00:00', accrueEnd:'2026-08-01T00:00:00', gross:4000.00, net:3181.92 },
-    { label:'Aug 1–15',   periodEnd:'2026-08-15', accrueStart:'2026-08-01T00:00:00', accrueEnd:'2026-08-16T00:00:00', gross:4000.00, net:3181.92 },
-    { label:'Aug 16–31',  periodEnd:'2026-08-31', accrueStart:'2026-08-16T00:00:00', accrueEnd:'2026-09-01T00:00:00', gross:4500.00, net:3533.67 },
-    { label:'Sep 1–15',   periodEnd:'2026-09-15', accrueStart:'2026-09-01T00:00:00', accrueEnd:'2026-09-16T00:00:00', gross:4500.00, net:3533.67 },
-    { label:'Sep 16–30',  periodEnd:'2026-09-30', accrueStart:'2026-09-16T00:00:00', accrueEnd:'2026-10-01T00:00:00', gross:4500.00, net:3533.67 },
-    { label:'Oct 1–15',   periodEnd:'2026-10-15', accrueStart:'2026-10-01T00:00:00', accrueEnd:'2026-10-16T00:00:00', gross:4500.00, net:3533.67 },
-    { label:'Oct 16–31',  periodEnd:'2026-10-31', accrueStart:'2026-10-16T00:00:00', accrueEnd:'2026-11-01T00:00:00', gross:4500.00, net:3533.67 },
-    { label:'Nov 1–15',   periodEnd:'2026-11-15', accrueStart:'2026-11-01T00:00:00', accrueEnd:'2026-11-16T00:00:00', gross:4500.00, net:3533.67 },
+    { label:'Jun 16–30 (partial)', periodEnd:'2026-06-30', payDate:'2026-07-05', accrueStart:'2026-06-23T00:00:00', accrueEnd:'2026-07-01T00:00:00', gross:2215.38, net:1870.90 },
+    { label:'Jul 1–15',   periodEnd:'2026-07-15', payDate:'2026-07-20', accrueStart:'2026-07-01T00:00:00', accrueEnd:'2026-07-16T00:00:00', gross:4000.00, net:3181.92 },
+    { label:'Jul 16–31',  periodEnd:'2026-07-31', payDate:'2026-08-05', accrueStart:'2026-07-16T00:00:00', accrueEnd:'2026-08-01T00:00:00', gross:4000.00, net:3181.92 },
+    { label:'Aug 1–15',   periodEnd:'2026-08-15', payDate:'2026-08-20', accrueStart:'2026-08-01T00:00:00', accrueEnd:'2026-08-16T00:00:00', gross:5000.00, net:3977.40 },
+    { label:'Aug 16–31',  periodEnd:'2026-08-31', payDate:'2026-09-05', accrueStart:'2026-08-16T00:00:00', accrueEnd:'2026-09-01T00:00:00', gross:4500.00, net:3533.67 },
+    { label:'Sep 1–15',   periodEnd:'2026-09-15', payDate:'2026-09-20', accrueStart:'2026-09-01T00:00:00', accrueEnd:'2026-09-16T00:00:00', gross:4500.00, net:3533.67 },
+    { label:'Sep 16–30',  periodEnd:'2026-09-30', payDate:'2026-10-05', accrueStart:'2026-09-16T00:00:00', accrueEnd:'2026-10-01T00:00:00', gross:4500.00, net:3533.67 },
+    { label:'Oct 1–15',   periodEnd:'2026-10-15', payDate:'2026-10-20', accrueStart:'2026-10-01T00:00:00', accrueEnd:'2026-10-16T00:00:00', gross:4500.00, net:3533.67 },
+    { label:'Oct 16–31',  periodEnd:'2026-10-31', payDate:'2026-11-05', accrueStart:'2026-10-16T00:00:00', accrueEnd:'2026-11-01T00:00:00', gross:4500.00, net:3533.67 },
+    { label:'Nov 1–15',   periodEnd:'2026-11-15', payDate:'2026-11-20', accrueStart:'2026-11-01T00:00:00', accrueEnd:'2026-11-16T00:00:00', gross:4500.00, net:3533.67 },
   ],
 };
 
@@ -340,7 +339,7 @@ CONFIG.periods.forEach(p => {
   p._s = new Date(p.accrueStart).getTime();
   p._e = new Date(p.accrueEnd).getTime();
   p._days = (p._e - p._s) / MS_DAY;
-  p._payDate = new Date(p.periodEnd + 'T00:00:00').getTime() + CONFIG.payDelayDays * MS_DAY;
+  p._payDate = new Date(p.payDate + 'T00:00:00').getTime();
 });
 // Normalize per-period net so the base sum lands exactly on stated total - bonus.
 const rawNetBase = CONFIG.periods.reduce((a,p)=>a+p.net,0);
