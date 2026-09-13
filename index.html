@@ -283,7 +283,7 @@
       <div class="dcard taxcard full">
         <h3>Set aside for taxes</h3>
         <div class="taxamt">$<span id="taxAmt">0.00</span></div>
-        <p>Sitting in checking but <b style="color:var(--text)">not yours</b> — the gap between what payroll deposited and what survives April’s filing. No Illinois tax (4.95%) withheld; federal under-withheld vs. your real 22% marginal rate. Ends at <b style="color:var(--muted);font-family:var(--mono)" id="taxCap">$5,805.13</b>.</p>
+        <p>Sitting in checking but <b style="color:var(--text)">not yours</b> — the gap between what payroll deposited and what survives April’s filing. No state tax withheld on the first three checks (Wisconsin, 5.3%, started Aug 20); federal under-withheld vs. your real 22% marginal rate. Ends at <b style="color:var(--muted);font-family:var(--mono)" id="taxCap">$4,098.01</b>.</p>
       </div>
 
       <div class="dcard full">
@@ -300,33 +300,42 @@
 
   <footer>
     Computed client-side from a hardcoded contract schedule · Jun 23 → Nov 15, 2026 · 146 days.<br/>
-    True keep scales gross by 31,533 / 48,215.38 (≈ 65.4%). Not tax advice.
+    True keep scales gross by 31,598 / 48,315.39 (≈ 65.4%). Not tax advice.
   </footer>
 </div>
 
 <script>
 /* ============================================================================
    CONFIG — every contract constant lives here.
+
+   Periods through Aug 31 are ACTUALS from paystubs (Jun 16 – Aug 31 stubs,
+   YTD gross 19,815.39 / net 15,232.50). Periods from Sep 1 on are projections:
+   gross 4,500 at the $51.92/hr rate that started Aug 16; net 3,307.98 derived
+   from the withholding observed on the stubs — federal 622.08 (2026 semi-monthly
+   tables, reproduces all three observed stubs to the cent), SS 279.00,
+   Medicare 65.25, WI 225.69 (WI withholding began with the Aug 20 check).
+   Pay dates: 5th and 20th, rolled back to Friday when that falls on a weekend
+   (observed: Jul 3, Sep 4).
    ========================================================================== */
 const CONFIG = {
   employmentStart: '2026-06-23T00:00:00',
   employmentEnd:   '2026-11-16T00:00:00',   // exclusive — through end of Nov 15
   totalCalendarDays: 146,
   trueKeepScale: 30879.00 / 47215.38,        // true keep = gross * this
-  totalsWithBonus: { gross: 48215.38, net: 37635.12, keep: 31533.00 },
-  totalsNoBonus:   { gross: 42215.38, net: 33414.12, keep: 42215.38 * (30879.00/47215.38) },
-  winBonus: { gross: 6000.00, net: 4221.00 },
+  totalsWithBonus: { gross: 48315.39, net: 35675.40, keep: 48315.39 * (30879.00/47215.38) },
+  totalsNoBonus:   { gross: 42315.39, net: 31772.40, keep: 42315.39 * (30879.00/47215.38) },
+  winBonus: { gross: 6000.00, net: 3903.00 },  // 22% fed supplemental + 7.65% FICA + 5.3% WI
   periods: [
-    { label:'Jun 16–30 (partial)', periodEnd:'2026-06-30', payDate:'2026-07-05', accrueStart:'2026-06-23T00:00:00', accrueEnd:'2026-07-01T00:00:00', gross:2215.38, net:1870.90 },
+    { label:'Jun 16–30 (partial)', periodEnd:'2026-06-30', payDate:'2026-07-03', accrueStart:'2026-06-23T00:00:00', accrueEnd:'2026-07-01T00:00:00', gross:2215.38, net:1870.90 },
     { label:'Jul 1–15',   periodEnd:'2026-07-15', payDate:'2026-07-20', accrueStart:'2026-07-01T00:00:00', accrueEnd:'2026-07-16T00:00:00', gross:4000.00, net:3181.92 },
     { label:'Jul 16–31',  periodEnd:'2026-07-31', payDate:'2026-08-05', accrueStart:'2026-07-16T00:00:00', accrueEnd:'2026-08-01T00:00:00', gross:4000.00, net:3181.92 },
-    { label:'Aug 1–15',   periodEnd:'2026-08-15', payDate:'2026-08-20', accrueStart:'2026-08-01T00:00:00', accrueEnd:'2026-08-16T00:00:00', gross:5000.00, net:3977.40 },
-    { label:'Aug 16–31',  periodEnd:'2026-08-31', payDate:'2026-09-05', accrueStart:'2026-08-16T00:00:00', accrueEnd:'2026-09-01T00:00:00', gross:4500.00, net:3533.67 },
-    { label:'Sep 1–15',   periodEnd:'2026-09-15', payDate:'2026-09-20', accrueStart:'2026-09-01T00:00:00', accrueEnd:'2026-09-16T00:00:00', gross:4500.00, net:3533.67 },
-    { label:'Sep 16–30',  periodEnd:'2026-09-30', payDate:'2026-10-05', accrueStart:'2026-09-16T00:00:00', accrueEnd:'2026-10-01T00:00:00', gross:4500.00, net:3533.67 },
-    { label:'Oct 1–15',   periodEnd:'2026-10-15', payDate:'2026-10-20', accrueStart:'2026-10-01T00:00:00', accrueEnd:'2026-10-16T00:00:00', gross:4500.00, net:3533.67 },
-    { label:'Oct 16–31',  periodEnd:'2026-10-31', payDate:'2026-11-05', accrueStart:'2026-10-16T00:00:00', accrueEnd:'2026-11-01T00:00:00', gross:4500.00, net:3533.67 },
-    { label:'Nov 1–15',   periodEnd:'2026-11-15', payDate:'2026-11-20', accrueStart:'2026-11-01T00:00:00', accrueEnd:'2026-11-16T00:00:00', gross:4500.00, net:3533.67 },
+    { label:'Aug 1–15 (+$100.01)', periodEnd:'2026-08-15', payDate:'2026-08-20', accrueStart:'2026-08-01T00:00:00', accrueEnd:'2026-08-16T00:00:00', gross:4100.01, net:3047.78 },
+    { label:'Aug 16–31 (+$1,000 relocation)', periodEnd:'2026-08-31', payDate:'2026-09-04', accrueStart:'2026-08-16T00:00:00', accrueEnd:'2026-09-01T00:00:00', gross:5500.00, net:3949.98 },
+    { label:'Sep 1–15',   periodEnd:'2026-09-15', payDate:'2026-09-18', accrueStart:'2026-09-01T00:00:00', accrueEnd:'2026-09-16T00:00:00', gross:4500.00, net:3307.98 },
+    { label:'Sep 16–30',  periodEnd:'2026-09-30', payDate:'2026-10-05', accrueStart:'2026-09-16T00:00:00', accrueEnd:'2026-10-01T00:00:00', gross:4500.00, net:3307.98 },
+    { label:'Oct 1–15',   periodEnd:'2026-10-15', payDate:'2026-10-20', accrueStart:'2026-10-01T00:00:00', accrueEnd:'2026-10-16T00:00:00', gross:4500.00, net:3307.98 },
+    { label:'Oct 16–31',  periodEnd:'2026-10-31', payDate:'2026-11-05', accrueStart:'2026-10-16T00:00:00', accrueEnd:'2026-11-01T00:00:00', gross:4500.00, net:3307.98 },
+    { label:'Nov 1–15',   periodEnd:'2026-11-15', payDate:'2026-11-20', accrueStart:'2026-11-01T00:00:00', accrueEnd:'2026-11-16T00:00:00', gross:4500.00, net:3307.98 },
   ],
 };
 
