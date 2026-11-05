@@ -247,10 +247,10 @@
   <div class="winbar">
     <div class="segswitch" id="winSwitch">
       <span class="glider"></span>
-      <button data-win="0" class="active">We lose<span class="em">bonus off</span></button>
-      <button data-win="1">We win<span class="em">+$6,000 bonus</span></button>
+      <button data-win="0">Had we lost<span class="em">bonus off</span></button>
+      <button data-win="1" class="active">We won<span class="em">+$6,000 bonus</span></button>
     </div>
-    <div class="wincaption" id="winCaption">Election hasn’t happened — showing guaranteed pay only.</div>
+    <div class="wincaption" id="winCaption">Cooke won WI-03 on Nov 3 — the $6,000 bonus is locked in.</div>
     <div class="freeze">Freezes at <b id="finalTotal">$0</b> on Nov 15, 2026.</div>
   </div>
 
@@ -325,6 +325,11 @@ const CONFIG = {
   totalsWithBonus: { gross: 48315.39, net: 35675.40, keep: 48315.39 * (30879.00/47215.38) },
   totalsNoBonus:   { gross: 42315.39, net: 31772.40, keep: 42315.39 * (30879.00/47215.38) },
   winBonus: { gross: 6000.00, net: 3903.00 },  // 22% fed supplemental + 7.65% FICA + 5.3% WI
+  // Cooke won WI-03 on election night, Nov 3 2026. The bonus is credited in
+  // full at the call rather than accrued across the contract — it was never a
+  // per-day entitlement, it became real the moment the race was called.
+  // Payout date not yet known; the schedule row says TBD until a stub lands.
+  winClinchedAt: '2026-11-03T22:30:00',
   periods: [
     { label:'Jun 16–30 (partial)', periodEnd:'2026-06-30', payDate:'2026-07-03', accrueStart:'2026-06-23T00:00:00', accrueEnd:'2026-07-01T00:00:00', gross:2215.38, net:1870.90 },
     { label:'Jul 1–15',   periodEnd:'2026-07-15', payDate:'2026-07-20', accrueStart:'2026-07-01T00:00:00', accrueEnd:'2026-07-16T00:00:00', gross:4000.00, net:3181.92 },
@@ -343,7 +348,6 @@ const CONFIG = {
 const MS_DAY = 86400000;
 const empStart = new Date(CONFIG.employmentStart).getTime();
 const empEnd   = new Date(CONFIG.employmentEnd).getTime();
-const empSpan  = empEnd - empStart;
 CONFIG.periods.forEach(p => {
   p._s = new Date(p.accrueStart).getTime();
   p._e = new Date(p.accrueEnd).getTime();
@@ -361,9 +365,10 @@ const fmtDate = ms => new Date(ms).toLocaleDateString('en-US',{month:'short',day
 /* ---- accrual ---- */
 function periodFrac(now,p){ if(now<=p._s)return 0; if(now>=p._e)return 1; return (now-p._s)/(p._e-p._s); }
 function baseAccrued(now){ let g=0,n=0; for(const p of CONFIG.periods){const f=periodFrac(now,p); g+=p.gross*f; n+=p._netAdj*f;} return {g,n}; }
-function bonusFrac(now){ if(now<=empStart)return 0; if(now>=empEnd)return 1; return (now-empStart)/empSpan; }
+const winClinch = new Date(CONFIG.winClinchedAt).getTime();
+function bonusFrac(now){ return now>=winClinch ? 1 : 0; }
 
-let mode='gross', winOn=false;
+let mode='gross', winOn=true;
 const MODE_LABEL={gross:'Gross',net:'Net deposited',keep:'True keep'};
 function modeValue(g,n){ return mode==='gross'?g : mode==='net'?n : g*CONFIG.trueKeepScale; }
 
@@ -465,7 +470,6 @@ function tick(){
   if(now>=empStart && now<empEnd){
     const active=CONFIG.periods.find(p=>now>=p._s && now<p._e);
     if(active){ dailyG=active.gross/active._days; dailyN=active._netAdj/active._days; }
-    if(winOn){ dailyG+=CONFIG.winBonus.gross/CONFIG.totalCalendarDays; dailyN+=CONFIG.winBonus.net/CONFIG.totalCalendarDays; }
   }
   const dayRate=modeValue(dailyG,dailyN);
   document.getElementById('rDay').textContent='$'+fmt(dayRate);
@@ -505,10 +509,10 @@ function refreshUI(){
 
   const cap=document.getElementById('winCaption');
   if(winOn){
-    const bonusDay=modeValue(CONFIG.winBonus.gross,CONFIG.winBonus.net)/CONFIG.totalCalendarDays;
-    cap.innerHTML='Contingent on winning — the $6,000 bonus adds about <b>$'+fmt(bonusDay)+'/day</b> in '+MODE_LABEL[mode].toLowerCase()+' terms.';
+    const bonusVal=modeValue(CONFIG.winBonus.gross,CONFIG.winBonus.net);
+    cap.innerHTML='Cooke won WI-03 on Nov 3 — <b>$'+fmt(bonusVal)+'</b> in '+MODE_LABEL[mode].toLowerCase()+' terms, credited in full at the call.';
   } else {
-    cap.innerHTML='Election hasn’t happened — showing guaranteed pay only.';
+    cap.innerHTML='Counterfactual — what the contract would have paid without the win.';
   }
   buildTable();
 }
@@ -522,7 +526,7 @@ function buildTable(){
     tb.appendChild(tr);
   }
   const br=document.createElement('tr'); br.className='bonusrow'+(winOn?'':' off');
-  br.innerHTML='<td>Win bonus</td><td>$'+fmt(CONFIG.winBonus.gross)+'</td><td>$'+fmt(CONFIG.winBonus.net)+'</td><td>on win</td><td><span class="pill c">Contingent</span></td>';
+  br.innerHTML='<td>Win bonus — won Nov 3</td><td>$'+fmt(CONFIG.winBonus.gross)+'</td><td>$'+fmt(CONFIG.winBonus.net)+'</td><td>TBD</td><td><span class="pill c">Pending payout</span></td>';
   tb.appendChild(br);
 }
 
