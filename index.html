@@ -149,28 +149,8 @@
     .flap-digit .half.flip.go::after{animation-duration:1ms !important}
   }
 
-  /* ============ WE WIN / WE LOSE TOGGLE ============ */
+  /* ============ WIN BANNER ============ */
   .winbar{margin-top:30px;display:flex;flex-direction:column;align-items:center;gap:12px}
-  .segswitch{
-    position:relative;display:inline-flex;background:rgba(0,0,0,.28);
-    border:1px solid var(--line);border-radius:99px;padding:5px;gap:4px;
-    box-shadow:inset 0 1px 4px rgba(0,0,0,.4);
-  }
-  .segswitch button{
-    appearance:none;border:0;background:transparent;color:var(--muted);
-    font-family:var(--sans);font-size:14px;font-weight:700;letter-spacing:.4px;
-    padding:11px 26px;border-radius:99px;cursor:pointer;transition:.18s;z-index:1;
-  }
-  .segswitch button .em{display:block;font-size:10px;font-weight:600;letter-spacing:.6px;color:var(--dim);margin-top:2px}
-  .segswitch button.active{color:#0c0d0f}
-  .segswitch button.active .em{color:rgba(12,13,15,.65)}
-  .segswitch .glider{
-    position:absolute;top:5px;bottom:5px;width:calc(50% - 5px);left:5px;
-    border-radius:99px;background:#e7ebf3;transition:transform .22s cubic-bezier(.4,0,.2,1);z-index:0;
-    box-shadow:0 3px 10px rgba(0,0,0,.35);
-  }
-  body.win .segswitch .glider{transform:translateX(100%);background:var(--win)}
-
   .wincaption{font-size:12px;color:var(--muted);text-align:center;min-height:16px;line-height:1.5;max-width:44ch}
   .wincaption b{color:var(--win);font-family:var(--mono);font-variant-numeric:tabular-nums}
   .freeze{font-size:11.5px;color:var(--dim);margin-top:2px}
@@ -223,12 +203,11 @@
   .pill.u{background:rgba(92,106,130,.16);color:var(--dim)}
   .pill.c{background:rgba(251,191,36,.14);color:var(--win)}
   tr.bonusrow td{color:var(--win);border-top:1px solid var(--line)}
-  tr.bonusrow.off{opacity:.4}
 
   footer{margin-top:30px;text-align:center;font-size:10.5px;color:var(--dim);line-height:1.6}
 </style>
 </head>
-<body>
+<body class="win">
 <div class="wrap">
 
   <!-- secondary: which figure the ticker shows -->
@@ -243,13 +222,8 @@
   <!-- THE FLIP TICKER -->
   <div class="board" id="board"></div>
 
-  <!-- WE WIN / WE LOSE -->
+  <!-- WON — bonus is locked in -->
   <div class="winbar">
-    <div class="segswitch" id="winSwitch">
-      <span class="glider"></span>
-      <button data-win="0">Had we lost<span class="em">bonus off</span></button>
-      <button data-win="1" class="active">We won<span class="em">+$6,000 bonus</span></button>
-    </div>
     <div class="wincaption" id="winCaption">Cooke won WI-03 on Nov 3 — the $6,000 bonus is locked in.</div>
     <div class="freeze">Freezes at <b id="finalTotal">$0</b> on Nov 15, 2026.</div>
   </div>
@@ -322,7 +296,7 @@ const CONFIG = {
   employmentEnd:   '2026-11-16T00:00:00',   // exclusive — through end of Nov 15
   totalCalendarDays: 146,
   trueKeepScale: 30879.00 / 47215.38,        // true keep = gross * this
-  totalsWithBonus: { gross: 48315.39, net: 35675.40, keep: 48315.39 * (30879.00/47215.38) },
+  // Base pay only — gross must equal the sum of the periods below.
   totalsNoBonus:   { gross: 42315.39, net: 31772.40, keep: 42315.39 * (30879.00/47215.38) },
   winBonus: { gross: 6000.00, net: 3903.00 },  // 22% fed supplemental + 7.65% FICA + 5.3% WI
   // Cooke won WI-03 on election night, Nov 3 2026. The bonus is credited in
@@ -346,6 +320,12 @@ const CONFIG = {
 
 /* ---- derived ---- */
 const MS_DAY = 86400000;
+// Contract total = base pay + the won bonus. Derived, so the two can't drift apart.
+CONFIG.totalsWithBonus = {
+  gross: CONFIG.totalsNoBonus.gross + CONFIG.winBonus.gross,
+  net:   CONFIG.totalsNoBonus.net   + CONFIG.winBonus.net,
+  keep: (CONFIG.totalsNoBonus.gross + CONFIG.winBonus.gross) * CONFIG.trueKeepScale,
+};
 const empStart = new Date(CONFIG.employmentStart).getTime();
 const empEnd   = new Date(CONFIG.employmentEnd).getTime();
 CONFIG.periods.forEach(p => {
@@ -356,7 +336,7 @@ CONFIG.periods.forEach(p => {
 });
 // Normalize per-period net so the base sum lands exactly on stated total - bonus.
 const rawNetBase = CONFIG.periods.reduce((a,p)=>a+p.net,0);
-const NET_FACTOR = (CONFIG.totalsWithBonus.net - CONFIG.winBonus.net) / rawNetBase;
+const NET_FACTOR = CONFIG.totalsNoBonus.net / rawNetBase;
 CONFIG.periods.forEach(p => p._netAdj = p.net * NET_FACTOR);
 
 const fmt  = n => n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -368,7 +348,7 @@ function baseAccrued(now){ let g=0,n=0; for(const p of CONFIG.periods){const f=p
 const winClinch = new Date(CONFIG.winClinchedAt).getTime();
 function bonusFrac(now){ return now>=winClinch ? 1 : 0; }
 
-let mode='gross', winOn=true;
+let mode='gross';
 const MODE_LABEL={gross:'Gross',net:'Net deposited',keep:'True keep'};
 function modeValue(g,n){ return mode==='gross'?g : mode==='net'?n : g*CONFIG.trueKeepScale; }
 
@@ -452,8 +432,8 @@ function tick(){
   const now=Date.now();
   const base=baseAccrued(now);
   const bf=bonusFrac(now);
-  const grossNow = base.g + (winOn?CONFIG.winBonus.gross*bf:0);
-  const netNow   = base.n + (winOn?CONFIG.winBonus.net  *bf:0);
+  const grossNow = base.g + CONFIG.winBonus.gross*bf;
+  const netNow   = base.n + CONFIG.winBonus.net  *bf;
 
   renderBoard(modeValue(grossNow, netNow));
 
@@ -499,21 +479,14 @@ function refreshUI(){
   document.getElementById('boardLabel').innerHTML=MODE_LABEL[mode]+' · earned so far';
   document.getElementById('rateMode').textContent=MODE_LABEL[mode].toLowerCase();
 
-  const totals=winOn?CONFIG.totalsWithBonus:CONFIG.totalsNoBonus;
+  const totals=CONFIG.totalsWithBonus;
   const finalVal=mode==='gross'?totals.gross:mode==='net'?totals.net:totals.keep;
   document.getElementById('finalTotal').textContent='$'+fmt(finalVal);
   document.getElementById('taxCap').textContent='$'+fmt(totals.net-totals.keep);
 
-  document.body.classList.toggle('win',winOn);
-  document.querySelectorAll('#winSwitch button').forEach(b=>b.classList.toggle('active',(b.dataset.win==='1')===winOn));
-
-  const cap=document.getElementById('winCaption');
-  if(winOn){
-    const bonusVal=modeValue(CONFIG.winBonus.gross,CONFIG.winBonus.net);
-    cap.innerHTML='Cooke won WI-03 on Nov 3 — <b>$'+fmt(bonusVal)+'</b> in '+MODE_LABEL[mode].toLowerCase()+' terms, credited in full at the call.';
-  } else {
-    cap.innerHTML='Counterfactual — what the contract would have paid without the win.';
-  }
+  const bonusVal=modeValue(CONFIG.winBonus.gross,CONFIG.winBonus.net);
+  document.getElementById('winCaption').innerHTML=
+    'Cooke won WI-03 on Nov 3 — <b>$'+fmt(bonusVal)+'</b> in '+MODE_LABEL[mode].toLowerCase()+' terms, credited in full at the call.';
   buildTable();
 }
 
@@ -525,14 +498,13 @@ function buildTable(){
     tr.innerHTML='<td>'+p.label+'</td><td>$'+fmt(p.gross)+'</td><td>$'+fmt(p.net)+'</td><td>'+fmtDate(p._payDate)+'</td><td><span class="pill '+(banked?'b':'u')+'">'+(banked?'Banked':'Upcoming')+'</span></td>';
     tb.appendChild(tr);
   }
-  const br=document.createElement('tr'); br.className='bonusrow'+(winOn?'':' off');
+  const br=document.createElement('tr'); br.className='bonusrow';
   br.innerHTML='<td>Win bonus — won Nov 3</td><td>$'+fmt(CONFIG.winBonus.gross)+'</td><td>$'+fmt(CONFIG.winBonus.net)+'</td><td>TBD</td><td><span class="pill c">Pending payout</span></td>';
   tb.appendChild(br);
 }
 
 /* ---- wiring ---- */
 document.getElementById('modes').addEventListener('click',e=>{const b=e.target.closest('button'); if(!b)return; mode=b.dataset.mode; refreshUI(); tick();});
-document.getElementById('winSwitch').addEventListener('click',e=>{const b=e.target.closest('button'); if(!b)return; winOn=b.dataset.win==='1'; refreshUI(); tick();});
 
 refreshUI();
 tick();
